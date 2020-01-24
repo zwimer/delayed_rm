@@ -9,7 +9,7 @@ import os
 
 
 # Config
-log_f = '/tmp/delay_rm.log'
+log_f = os.path.expanduser('~/.delay_rm.log')
 d_time = 900
 
 # usage: Just like rm

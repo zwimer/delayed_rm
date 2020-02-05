@@ -102,6 +102,7 @@ def main(path, *args):
 
     # Move files into a temp directory
     outd = tempfile.mkdtemp()
+    os.chmod(outd, 0o700)
     names = list(files)
     for f in names:
         try:

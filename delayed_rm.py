@@ -10,6 +10,7 @@ import os
 
 # Config
 log_f = os.path.expanduser('~/.delay_rm.log')
+temp_d_location = '/tmp/delayed_rm_tmp/'
 d_time = 900
 
 # usage: Just like rm
@@ -92,6 +93,8 @@ def die_and_delay_del(del_dir, code):
 
 # Main function
 def main(path, *args):
+    os.makedirs(temp_d_location, mode=0o777, exist_ok=True)
+
     basename = os.path.basename(path)
     assert os.path.exists(os.path.dirname(log_f)), \
         'log file enclosing directory does not exist'
@@ -101,7 +104,7 @@ def main(path, *args):
     rf, files = parse_and_validate_args(args)
 
     # Move files into a temp directory
-    outd = tempfile.mkdtemp()
+    outd = tempfile.mkdtemp(dir=temp_d_location)
     os.chmod(outd, 0o700)
     names = list(files)
     for f in names:

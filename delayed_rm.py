@@ -62,9 +62,10 @@ def unsafe_parse_and_validate_args(args):
             if i in f_f: _f = True
         else:
             # Ensure any passed files exist
-            add = os.path.realpath(i)
+            add = os.path.abspath(i)
             assert os.path.exists(add), 'Error: ' + add + ' is not a file or directory'
-            any_dirs |= os.path.isdir(add)
+            if not os.path.islink(add):
+                any_dirs |= os.path.isdir(add)
             items.add(add)
     # Ensure files were passed
     assert len(items) > 0, 'Error: Nothing to remove'

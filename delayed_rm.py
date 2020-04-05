@@ -63,7 +63,7 @@ def unsafe_parse_and_validate_args(args):
         else:
             # Ensure any passed files exist
             add = os.path.abspath(i)
-            assert os.path.exists(add), 'Error: ' + add + ' is not a file or directory'
+            assert os.path.lexists(add), 'Error: ' + add + ' is not a file or directory'
             if not os.path.islink(add):
                 any_dirs |= os.path.isdir(add)
             items.add(add)

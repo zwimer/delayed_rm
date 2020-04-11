@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from multiprocessing import Process
 
+import argparse
 import tempfile
 import shutil
 import time
@@ -22,62 +23,23 @@ d_time = 900
 def print_log():
     try:
         with open(log_f) as f:
-            outs = f.read() + '\n'
+            outs = f.read()
     except FileNotFoundError:
         outs = ''
     outs += 'log file: ' + log_f
     print(outs)
 
 # Parse arguments, print and error if something went wrong.
-def parse_and_validate_args(args):
-    if len(args) == 0:
-        print('Error: no arguments')
-        sys.exit(1)
-    if args[0] == ('--log'):
-        print_log()
-        sys.exit(0)
-    try:
-        return unsafe_parse_and_validate_args(args)
-    except AssertionError as err:
-        print(err)
-        sys.exit(1)
-
-# Parse arguments
-# Throw an error if argument parsing fails or argument validation fails
-def unsafe_parse_and_validate_args(args):
-    _f = False
-    _r = False
-    _rf = False
-    rf_f = set([ '-rf', '-fr' ])
-    f_f = set(['-f']) | rf_f
-    r_f = set(['-r']) | rf_f
-    valid = f_f | r_f
-    items = set()
-    any_dirs = False
-    for i in args:
-        if i.startswith('-'):
-            # Ensure only -r, -f, -rf or -fr were passed as flags
-            assert i in valid, 'Error: delay_rm only supports -rf'
-            if i in r_f: _r = True
-            if i in f_f: _f = True
-        else:
-            # Ensure any passed files exist
-            add = os.path.abspath(i)
-            assert os.path.lexists(add), 'Error: ' + add + ' is not a file or directory'
-            if not os.path.islink(add):
-                any_dirs |= os.path.isdir(add)
-            items.add(add)
-    # Ensure files were passed
-    assert len(items) > 0, 'Error: Nothing to remove'
-    # Ensure -r and -f were both used
-    if _r or _f:
-        assert _r and _f, 'Error: delay_rm does not support -f or -r without the other'
-        _rf = True
-    else:
-        # Ensure no directories were requested to be deleted without -rf
-        assert any_dirs == False, 'Error: no dirs allowed without -rf'
-    # Return if -rf was used and a set of items to delete
-    return (_rf, items)
+def validate_files(files, rf):
+    files = [ os.path.abspath(i) for i in files ]
+    assert len(files) == len(set(files)), 'duplicate items passed'
+    assert len(files) == len(set([os.path.basename(i) for i in files])),\
+        'Files of same basename has yet to be implemented'
+    for i in files:
+        assert os.path.lexists(i), i + ' is not a file or directory'
+        if not rf:
+            assert (not os.path.isdir(i)) or os.path.islink(i), \
+                i + ' is a directory. -rf required!'
 
 # Sleep for a while then delete del_dir
 def delay_rm(del_dir):
@@ -86,57 +48,89 @@ def delay_rm(del_dir):
     f = shutil.rmtree(del_dir)
 
 # Create the delayed deletion process then die
-def die_and_delay_del(del_dir, code):
+def die_and_delay_del(del_dir, rc):
     p = Process(target=delay_rm, args=(del_dir,))
     p.start()
     # Die but do not kill child
-    os._exit(code)
+    os._exit(rc)
+
+# Write a log
+def write_log(msg):
+    try:
+        with open(log_f, 'a') as f:
+            f.write(msg + '\n')
+            return True
+    except:
+        print('Error: could not log delay dir in ' + log_f + '\nInfo:\n' + msg)
+        return False
 
 # Main function
-def main(path, *args):
-    os.makedirs(temp_d_location, mode=0o777, exist_ok=True)
-
-    basename = os.path.basename(path)
+def delayed_rm(files, log, rf):
+    if log:
+        print_log()
+        sys.exit(0)
+    validate_files(files, rf)
     assert os.path.exists(os.path.dirname(log_f)), \
         'log file enclosing directory does not exist'
-    code = 0
 
-    # Arg parse
-    rf, files = parse_and_validate_args(args)
+    # Output location
+    os.makedirs(temp_d_location, mode=0o777, exist_ok=True)
 
     # Move files into a temp directory
     outd = tempfile.mkdtemp(dir=temp_d_location)
     os.chmod(outd, 0o700)
-    names = list(files)
-    for f in names:
+    success = []
+    failed = []
+    for f in files:
         try:
             shutil.move(f, outd)
-            files.remove(f)
+            success.append(f)
         except Exception as err:
+            failed.append(f)
             print(err)
             pass
-    if len(files) > 0:
-        print('Error: failed to rm:\n' + '\n'.join(files))
-        code = 1
-    if len(files) == len(names):
-        sys.exit(1)
 
-    # Note location
-    msg = '\n* ' + basename + (' -rf' if rf else '') + ':'
-    msg += ' \n*\t' + ' \n*\t'.join(set(names) - files)
-    msg += ' \n* Files temporarily stored in:\n' + outd + '\n'
-    try:
-        with open(log_f, 'a') as f:
-            f.write(msg)
-    except:
-        msg = 'Error: could not log delay dir in ' + log_f + '\nInfo:\n' + msg
-        print(msg)
-        code = 1
+    # Inform user of failures
+    if len(failed) > 0:
+        print('Error: failed to rm:\n' + '\n'.join(failed))
+
+    # Log result
+    delim = '\n    - '
+    msg = outd + '\n'
+    msg += '  Flags: ' + ('-rf' if rf else 'None') + '\n'
+    msg += '  Succeeded:'
+    msg += (' None' if len(success) == 0 else (delim + delim.join(success))) + '\n'
+    msg += '  Failed:'
+    msg += (' None' if len(failed) == 0 else (delim + delim.join(failed))) + '\n'
+    log_success = write_log(msg)
 
     # Delay rm and die
-    die_and_delay_del(outd, code)
+    rc = int(not log_success | len(failed) > 0)
+    die_and_delay_del(outd, rc)
+    return rc
+
+def parse_args(prog, args):
+    parser = argparse.ArgumentParser(prog=os.path.basename(prog))
+    parser.add_argument('-r', action='store_true', default=False)
+    parser.add_argument('-f', action='store_true', default=False)
+    parser.add_argument('-l', '--log', action='store_true', default=False)
+    parser.add_argument('files', nargs='*')
+    return parser.parse_args(args)
+
+def main(prog, args):
+    ns = parse_args(prog, args)
+    try:
+        if ns.log:
+            assert len(args) == 1, '--log may not be used with other arguments'
+        else:
+            assert len(ns.files) > 0, 'Error: No files passed'
+        assert ns.r == ns.f, 'Error: -r and -f must be used together.'
+        return delayed_rm(ns.files, ns.log, ns.r and ns.f)
+    except AssertionError as msg:
+        print('Error: ' + str(msg))
+        return -1
 
 
 # Don't run on imports
 if __name__ == '__main__':
-    main(*sys.argv)
+    sys.exit(main(sys.argv[0], sys.argv[1:]))

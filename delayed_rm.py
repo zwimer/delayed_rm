@@ -64,8 +64,16 @@ def write_log(msg):
         print('Error: could not log delay dir in ' + log_f + '\nInfo:\n' + msg)
         return False
 
+# Real rm
+def rm_r(f):
+    assert os.path.exists(f), f + ' does not exist'
+    if os.path.isdir(f) and not os.path.islink(f):
+        shutil.rmtree(f)
+    else:
+        os.remove(f)
+
 # Main function
-def delayed_rm(files, log, rf):
+def delayed_rm(files, log, rf, now):
     if log:
         print_log()
         sys.exit(0)
@@ -77,13 +85,17 @@ def delayed_rm(files, log, rf):
     os.makedirs(temp_d_location, mode=0o777, exist_ok=True)
 
     # Move files into a temp directory
-    outd = tempfile.mkdtemp(dir=temp_d_location)
-    os.chmod(outd, 0o700)
+    if not now:
+        outd = tempfile.mkdtemp(dir=temp_d_location)
+        os.chmod(outd, 0o700)
     success = []
     failed = []
     for f in files:
         try:
-            shutil.move(f, outd)
+            if now:
+                rm_r(f)
+            else:
+                shutil.move(f, outd)
             success.append(f)
         except Exception as err:
             failed.append(f)
@@ -96,8 +108,9 @@ def delayed_rm(files, log, rf):
 
     # Log result
     delim = '\n    - '
-    msg = outd + '\n'
-    msg += '  Flags: ' + ('-rf' if rf else 'None') + '\n'
+    msg = ('Real rm' if now else outd) + '\n'
+    flags = (('-rf' if rf else '') + ' ' + ('--now' if now else '')).strip()
+    msg += '  Flags: ' + (flags if len(flags) else 'None') + '\n'
     msg += '  Succeeded:'
     msg += (' None' if len(success) == 0 else (delim + delim.join(success))) + '\n'
     msg += '  Failed:'
@@ -106,7 +119,8 @@ def delayed_rm(files, log, rf):
 
     # Delay rm and die
     rc = int(not log_success | len(failed) > 0)
-    die_and_delay_del(outd, rc)
+    if not now:
+        die_and_delay_del(outd, rc)
     return rc
 
 def parse_args(prog, args):
@@ -114,6 +128,7 @@ def parse_args(prog, args):
     parser.add_argument('-r', action='store_true', default=False)
     parser.add_argument('-f', action='store_true', default=False)
     parser.add_argument('-l', '--log', action='store_true', default=False)
+    parser.add_argument('--now', action='store_true', default=False)
     parser.add_argument('files', nargs='*')
     return parser.parse_args(args)
 
@@ -125,7 +140,7 @@ def main(prog, args):
         else:
             assert len(ns.files) > 0, 'Error: No files passed'
         assert ns.r == ns.f, 'Error: -r and -f must be used together.'
-        return delayed_rm(ns.files, ns.log, ns.r and ns.f)
+        return delayed_rm(ns.files, ns.log, ns.r and ns.f, ns.now)
     except AssertionError as msg:
         print('Error: ' + str(msg))
         return -1

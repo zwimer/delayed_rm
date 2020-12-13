@@ -18,6 +18,9 @@ d_time = 900
 # Supports: -rf
 # --log will print log information
 
+# Print to stderr
+def eprint(*args):
+    print(*args, file=sys.stderr)
 
 # Print the log information
 def print_log():
@@ -27,7 +30,7 @@ def print_log():
     except FileNotFoundError:
         outs = ''
     outs += 'log file: ' + log_f
-    print(outs)
+    eprint(outs)
 
 # Parse arguments, print and error if something went wrong.
 def validate_files(files, rf):
@@ -61,7 +64,7 @@ def write_log(msg):
             f.write(msg + '\n')
             return True
     except:
-        print('Error: could not log delay dir in ' + log_f + '\nInfo:\n' + msg)
+        eprint('Error: could not log delay dir in ' + log_f + '\nInfo:\n' + msg)
         return False
 
 # Real rm
@@ -99,12 +102,12 @@ def delayed_rm(files, log, rf, now):
             success.append(f)
         except Exception as err:
             failed.append(f)
-            print(err)
+            eprint(err)
             pass
 
     # Inform user of failures
     if len(failed) > 0:
-        print('Error: failed to rm:\n' + '\n'.join(failed))
+        eprint('Error: failed to rm:\n' + '\n'.join(failed))
 
     # Log result
     delim = '\n    - '
@@ -142,7 +145,7 @@ def main(prog, args):
         assert ns.r == ns.f, 'Error: -r and -f must be used together.'
         return delayed_rm(ns.files, ns.log, ns.r and ns.f, ns.now)
     except AssertionError as msg:
-        print('Error: ' + str(msg))
+        eprint('Error: ' + str(msg))
         return -1
 
 

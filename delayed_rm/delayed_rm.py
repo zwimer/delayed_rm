@@ -12,7 +12,7 @@ import sys
 import os
 
 
-__version__ = "2.0.2"
+__version__ = "2.1.0"
 
 
 #
@@ -105,7 +105,15 @@ def delayed_rm(paths: List[Path], delay: int, rf: bool) -> bool:
         # Move file into the temp directory
         try:
             new: Path = outd / p.name
-            p.rename(new)
+            try:
+                p.rename(new)
+            except OSError:
+                if p.is_dir():
+                    shutil.copytree(p, new)
+                    shutil.rmtree(p)
+                else:
+                    shutil.copy2(p, new)
+                    p.unlink()
             full_where[p] = new
             where[p.name].add(outd)
             success.append(p)
@@ -122,19 +130,22 @@ def delayed_rm(paths: List[Path], delay: int, rf: bool) -> bool:
     msg: str = str(datetime.now()) + "\n  " + "\n".join((
         f"Delay: {delay}",
         f"rf: {rf}",
+        f"Storage Directory: {base}",
         f"Succeeded:{fmt(success_plus)}",
         f"Failed:{fmt(failed_plus)}",
-        f"Storage Directory: {base}",
     )).replace("\n", "\n  ") + "\n\n"
     with log_f.open("a") as f:
         f.write(msg)
     # Delay rm and die
-    subprocess.Popen(
-        (sys.executable, __file__, _Secret.value, str(delay), base),
-        env = { _Secret.key: _Secret.value },
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+    if success:
+        shutil.rmtree(base)
+    else:
+        subprocess.Popen(
+            (sys.executable, __file__, _Secret.value, str(delay), base),
+            env = { _Secret.key: _Secret.value },
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
     return not failed
 
 

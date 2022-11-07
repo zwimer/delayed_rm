@@ -12,7 +12,7 @@ import sys
 import os
 
 
-__version__ = "2.0.1"
+__version__ = "2.0.2"
 
 
 #
@@ -122,7 +122,6 @@ def delayed_rm(paths: List[Path], delay: int, rf: bool) -> bool:
     msg: str = str(datetime.now()) + "\n  " + "\n".join((
         f"Delay: {delay}",
         f"rf: {rf}",
-        "Paths:\n  " + "\n  ".join(str(i) for i in paths),
         f"Succeeded:{fmt(success_plus)}",
         f"Failed:{fmt(failed_plus)}",
         f"Storage Directory: {base}",

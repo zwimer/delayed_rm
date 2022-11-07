@@ -12,7 +12,7 @@ import sys
 import os
 
 
-__version__ = "2.0.0"
+__version__ = "2.0.1"
 
 
 #
@@ -124,7 +124,7 @@ def delayed_rm(paths: List[Path], delay: int, rf: bool) -> bool:
         f"rf: {rf}",
         "Paths:\n  " + "\n  ".join(str(i) for i in paths),
         f"Succeeded:{fmt(success_plus)}",
-        f"Failed:{fmt(failed_plus)}"
+        f"Failed:{fmt(failed_plus)}",
         f"Storage Directory: {base}",
     )).replace("\n", "\n  ") + "\n\n"
     with log_f.open("a") as f:

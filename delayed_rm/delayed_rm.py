@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, List, Dict, Set, Any
+from typing import Callable, List, Dict, Set, Any
 from collections import defaultdict
 from tempfile import gettempdir
 from datetime import datetime
@@ -12,7 +12,7 @@ import sys
 import os
 
 
-__version__ = "2.2.0"
+__version__ = "2.2.1"
 
 
 #
@@ -54,7 +54,7 @@ def mkdir(ret: Path) -> Path:
     return ret
 
 
-def validate_paths(paths: Path, rf: bool) -> bool:
+def validate_paths(paths: List[Path], rf: bool) -> bool:
     """
     Verify paths and that they can be removed with rf set as it is
     """
@@ -90,9 +90,9 @@ def delayed_rm(paths: List[Path], delay: int, rf: bool) -> bool:
     # Init data structures
     success: List[Path] = []
     failed: List[Path] = []
-    out_dirs: List[Path] = { mkdir(base / "0") }
+    out_dirs: Set[Path] = { mkdir(base / "0") }
     where: Dict[str, Set[Path]] = defaultdict(set)
-    full_where: Dict[str, Path] = {}
+    full_where: Dict[Path, Path] = {}
     # Delete files
     for p in paths:
         # Select an output directory that an item of name p.name does not exist
@@ -140,7 +140,7 @@ def delayed_rm(paths: List[Path], delay: int, rf: bool) -> bool:
     if success:
         shutil.rmtree(base)
     else:
-        subprocess.Popen(
+        subprocess.Popen(  # pylint: disable=consider-using-with
             (sys.executable, __file__, _Secret.value, str(delay), base),
             env = { _Secret.key: _Secret.value },
             stdout=subprocess.DEVNULL,
@@ -184,7 +184,7 @@ def main(prog: str, *args: str) -> bool:
     parser.add_argument("-r", action="store_true", help="rm -r; must use -f with this")
     parser.add_argument("-f", action="store_true", help="rm -f; must use -r with this")
     parser.add_argument("paths", type=Path, nargs="*", help="The items to delete")
-    delayed_rm_raw(**vars(parser.parse_args(args)))
+    return delayed_rm_raw(**vars(parser.parse_args(args)))
 
 
 def cli() -> None:
@@ -214,7 +214,7 @@ def _secret_cli():
                 shutil.rmtree(d)
                 with log_f.open("a") as f:
                     f.write(f"Daemon: Removing: {d}" + "\n\n")
-    except Exception as e:
+    except Exception:
         sys.stderr = log_f.open("a")
         sys.stdout = sys.stderr
         print(f"argv: {sys.argv}", flush=True)

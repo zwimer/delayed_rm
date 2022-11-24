@@ -12,7 +12,7 @@ import sys
 import os
 
 
-__version__ = "2.2.2"
+__version__ = "2.2.3"
 
 
 #
@@ -137,7 +137,7 @@ def delayed_rm(paths: List[Path], delay: int, rf: bool) -> bool:
     with log_f.open("a") as f:
         f.write(msg)
     # Delay rm and die
-    if success:
+    if not success:
         shutil.rmtree(base)
     else:
         subprocess.Popen(  # pylint: disable=consider-using-with
@@ -191,6 +191,8 @@ def cli() -> None:
     """
     delayed_rm CLI
     """
+    with open("/tmp/qqq", "a") as f:
+        f.write("normal: " + str(sys.argv) + "\n")
     sys.exit(main(*sys.argv))
 
 
@@ -205,6 +207,8 @@ def _secret_cli():
     This CLI will only active if argv was intentionally configured to do so
     This entrypoint is for the spawned process to act
     """
+    with open("/tmp/qqq", "a") as f:
+        f.write("secret: " + str(sys.argv) + "\n")
     try:
         if len(sys.argv) == 4 and sys.argv[1] == _Secret.value:
             if os.environ.get(_Secret.key, None) == _Secret.value:
@@ -213,7 +217,7 @@ def _secret_cli():
                 time.sleep(delay)
                 shutil.rmtree(d)
                 with log_f.open("a") as f:
-                    f.write(f"Daemon: Removing: {d}" + "\n\n")
+                    f.write(f"Removing: {d}" + "\n\n")
     except Exception:
         sys.stderr = log_f.open("a")
         sys.stdout = sys.stderr

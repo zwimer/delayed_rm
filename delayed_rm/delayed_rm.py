@@ -12,7 +12,7 @@ import sys
 import os
 
 
-__version__ = "2.2.3"
+__version__ = "2.2.4"
 
 
 #
@@ -191,8 +191,6 @@ def cli() -> None:
     """
     delayed_rm CLI
     """
-    with open("/tmp/qqq", "a") as f:
-        f.write("normal: " + str(sys.argv) + "\n")
     sys.exit(main(*sys.argv))
 
 
@@ -207,8 +205,6 @@ def _secret_cli():
     This CLI will only active if argv was intentionally configured to do so
     This entrypoint is for the spawned process to act
     """
-    with open("/tmp/qqq", "a") as f:
-        f.write("secret: " + str(sys.argv) + "\n")
     try:
         if len(sys.argv) == 4 and sys.argv[1] == _Secret.value:
             if os.environ.get(_Secret.key, None) == _Secret.value:

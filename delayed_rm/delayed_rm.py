@@ -12,7 +12,7 @@ import sys
 import os
 
 
-__version__ = "2.2.4"
+__version__ = "2.3.0"
 
 
 #
@@ -76,6 +76,7 @@ def delayed_rm(paths: List[Path], delay: int, rf: bool) -> bool:
     Move paths to a temprary directory, delete them after delay seconds
     Log's this action to the log
     If rf, acts like rm -rf
+    :returns: True on success, else False
     """
     assert tmp_d.parent.exists(), "Temp dir enclosing directory does not exist"
     assert log_f.parent.exists(), "Log file enclosing directory does not exist"
@@ -152,6 +153,7 @@ def delayed_rm(paths: List[Path], delay: int, rf: bool) -> bool:
 def delayed_rm_raw(delay: int, log: bool, r: bool, f: bool, paths: List[Path]) -> bool:
     """
     Handles argument verification before invoking delayed_rm properly
+    :returns: True on success, else False
     """
     if log:
         if r or f or paths:
@@ -184,7 +186,7 @@ def main(prog: str, *args: str) -> bool:
     parser.add_argument("-r", action="store_true", help="rm -r; must use -f with this")
     parser.add_argument("-f", action="store_true", help="rm -f; must use -r with this")
     parser.add_argument("paths", type=Path, nargs="*", help="The items to delete")
-    return delayed_rm_raw(**vars(parser.parse_args(args)))
+    return not delayed_rm_raw(**vars(parser.parse_args(args)))
 
 
 def cli() -> None:

@@ -12,7 +12,7 @@ import sys
 import os
 
 
-__version__ = "2.3.0"
+__version__ = "2.3.1"
 
 
 #
@@ -62,12 +62,13 @@ def validate_paths(paths: List[Path], rf: bool) -> bool:
         eprint("duplicate items passed")
         return False
     for i in paths:
-        if not i.exists() and not i.is_symlink():
-            eprint(f"{i} does not exist")
-            return False
-        elif not rf and i.is_dir():
-            eprint(f"{i} is a directory. -rf required!")
-            return False
+        if not i.is_symlink():
+            if not i.exists():
+                eprint(f"{i} does not exist")
+                return False
+            elif not rf and i.is_dir():
+                eprint(f"{i} is a directory. -rf required!")
+                return False
     return True
 
 

@@ -1,5 +1,6 @@
-from typing import Callable, List, Dict, Set, Any
+from __future__ import annotations
 from collections import defaultdict
+from typing import Callable, Set
 from tempfile import gettempdir
 from datetime import datetime
 from pathlib import Path
@@ -12,7 +13,7 @@ import sys
 import os
 
 
-__version__ = "2.3.1"
+__version__ = "2.4.0"
 
 
 #
@@ -20,8 +21,20 @@ __version__ = "2.3.1"
 #
 
 
-log_f: Path = Path.home() / ".delayed_rm.log"
-tmp_d: Path = Path(gettempdir()) / ".delayed_rm"
+log_f: Path = Path.home().resolve() / ".delayed_rm.log"
+tmp_d: Path = Path(gettempdir()).resolve() / ".delayed_rm"
+
+
+#
+# Classes
+#
+
+
+class RMError(Exception):
+    """
+    A custom class meant to be raised for 'expected' errors
+    Raising this should lead to the cli program exiting
+    """
 
 
 class _Secret:
@@ -38,14 +51,19 @@ class _Secret:
 #
 
 
-def eprint(msg: Any) -> None:
+def _eprint(e: str | BaseException) -> None:
     """
-    Print msg to stderr
+    Print e to stderr
     """
-    print(f"Error: {msg}", file=sys.stderr)
+    e2: str | BaseException = e
+    if isinstance(e, RMError) and isinstance(e.__cause__, BaseException):
+        e2 = e.__cause__
+    err: str = "Error" if isinstance(e2, RMError) or not isinstance(e, BaseException) else \
+        str(type(e2)).split("'")[1].split("delayed_rm.")[-1]
+    print(f"{err}: {e}", file=sys.stderr)
 
 
-def mkdir(ret: Path) -> Path:
+def _mkdir(ret: Path) -> Path:
     """
     Make base/name and set permissions to 700
     """
@@ -54,47 +72,57 @@ def mkdir(ret: Path) -> Path:
     return ret
 
 
-def validate_paths(paths: List[Path], rf: bool) -> bool:
+def _prep(paths: list[Path], rf: bool) -> list[Path]:
     """
-    Verify paths and that they can be removed with rf set as it is
+    Normalize paths, error check, and prep temp items
+    :return: A normalized list of paths
     """
-    if len(paths) != len(set(paths)):
-        eprint("duplicate items passed")
-        return False
+    # Normalize paths and error checking
+    try:
+        paths = [ i.parent.resolve(strict=True) / i.name for i in paths ]
+        # pathlib.stat does not support follow_symlinks until 3.10
+        if len(paths) != len({os.stat(i, follow_symlinks=False).st_ino for i in paths}):
+            raise RMError("duplicate items passed")
+    except (FileNotFoundError, RuntimeError) as e:
+        raise RMError(e) from e
     for i in paths:
-        if not i.is_symlink():
-            if not i.exists():
-                eprint(f"{i} does not exist")
-                return False
-            elif not rf and i.is_dir():
-                eprint(f"{i} is a directory. -rf required!")
-                return False
-    return True
+        if not rf and not i.is_symlink() and i.is_dir():
+            raise RMError(f"{i} is a directory. -rf required!")
+        if tmp_d == i:
+            raise RMError(f"Will not delete {tmp_d}")
+        if tmp_d in i.parents:
+            raise RMError(f"Will not delete items within {tmp_d}")
+    # Prep temp items
+    log_f.touch()
+    if log_f.is_symlink() or not log_f.is_file():
+        raise RMError(f"{log_f} is not a file.")
+    try:
+        tmp_d.mkdir(exist_ok=True)
+    except (OSError, FileExistsError) as e:
+        raise RMError(f"Could not create directory and set permissions on {tmp_d}") from e
+    return paths
 
 
-def delayed_rm(paths: List[Path], delay: int, rf: bool) -> bool:
+def delayed_rm(paths: list[Path], delay: int, rf: bool) -> bool:
     """
     Move paths to a temprary directory, delete them after delay seconds
     Log's this action to the log
     If rf, acts like rm -rf
+    May raise an RMError if something goes wrong
     :returns: True on success, else False
     """
     assert tmp_d.parent.exists(), "Temp dir enclosing directory does not exist"
     assert log_f.parent.exists(), "Log file enclosing directory does not exist"
-    paths = [ i.absolute() for i in paths ]
-    if not validate_paths(paths, rf):
-        return False
-    # Prepare output locations
-    log_f.touch()
-    tmp_d.mkdir(exist_ok=True)
+    # Prep
+    paths = _prep(paths, rf)
     base = Path(tempfile.mkdtemp(dir=tmp_d))
     base.chmod(0o700)
     # Init data structures
-    success: List[Path] = []
-    failed: List[Path] = []
-    out_dirs: Set[Path] = { mkdir(base / "0") }
-    where: Dict[str, Set[Path]] = defaultdict(set)
-    full_where: Dict[Path, Path] = {}
+    success: list[Path] = []
+    failed: list[Path] = []
+    out_dirs: Set[Path] = { _mkdir(base / "0") }
+    where: dict[str, Set[Path]] = defaultdict(set)
+    full_where: dict[Path, Path] = {}
     # Delete files
     for p in paths:
         # Select an output directory that an item of name p.name does not exist
@@ -102,7 +130,7 @@ def delayed_rm(paths: List[Path], delay: int, rf: bool) -> bool:
         if len(out_dirs) != len(where[p.name]):
             outd = next(iter(out_dirs - where[p.name]))
         else:
-            outd = mkdir(base / str(len(out_dirs)))
+            outd = _mkdir(base / str(len(out_dirs)))
             out_dirs.add(outd)
         # Move file into the temp directory
         try:
@@ -111,24 +139,24 @@ def delayed_rm(paths: List[Path], delay: int, rf: bool) -> bool:
                 p.rename(new)
             except OSError:
                 if p.is_dir():
-                    shutil.copytree(p, new)
+                    shutil.copytree(p, new) # TODO: , follow_symlinks=False)
                     shutil.rmtree(p)
                 else:
-                    shutil.copy2(p, new)
+                    shutil.copy2(p, new) # TODO: , follow_symlinks=False)
                     p.unlink()
             full_where[p] = new
             where[p.name].add(outd)
             success.append(p)
         except OSError as e:
             failed.append(p)
-            eprint(e)
+            _eprint(e)
     # Inform user of failures
-    failed_plus: List[str] = [str(i) for i in failed]
+    failed_plus: list[str] = [str(i) for i in failed]
     if len(failed) > 0:
-        eprint("Error: failed to rm:\n" + "\n".join(failed_plus))
+        _eprint("failed to rm:\n  " + "\n  ".join(failed_plus))
     # Log result
-    success_plus: List[str] = [f"{i}  --->  {full_where[i]}" for i in success]
-    fmt: Callable[[List[str]], str] = lambda l: ("\n  " + "\n  ".join(l)) if l else " None"
+    success_plus: list[str] = [f"{i}  --->  {full_where[i]}" for i in success]
+    fmt: Callable[[list[str]], str] = lambda l: ("\n  " + "\n  ".join(l)) if l else " None"
     msg: str = str(datetime.now()) + "\n  " + "\n".join((
         f"Delay: {delay}",
         f"rf: {rf}",
@@ -151,31 +179,35 @@ def delayed_rm(paths: List[Path], delay: int, rf: bool) -> bool:
     return not failed
 
 
-def delayed_rm_raw(delay: int, log: bool, r: bool, f: bool, paths: List[Path]) -> bool:
+def delayed_rm_raw(delay: int, log: bool, r: bool, f: bool, paths: list[Path]) -> bool:
     """
-    Handles argument verification before invoking delayed_rm properly
+    A delayed_rm wrapper that handles CLI arguments
     :returns: True on success, else False
     """
-    if log:
-        if r or f or paths:
-            eprint("--log may not be used with other arguments")
-            return False
-        if log_f.exists():
-            with log_f.open("r") as file:
-                data: str = file.read()
-            print(data + f"Log file: {log_f}")
+    try:
+        if log:
+            if r or f or paths:
+                _eprint("--log may not be used with other arguments")
+                return False
+            if log_f.exists():
+                with log_f.open("r") as file:
+                    data: str = file.read()
+                print(data + f"Log file: {log_f}")
+            else:
+                print("Log is empty")
+            return True
+        if not paths:
+            _eprint("nothing to remove")
+        elif r != f:
+            _eprint("-r and -f must be used together")
+        elif delay < 0:
+            _eprint("delay may not be negative")
         else:
-            print("Log is empty")
-        return True
-    if not paths:
-        eprint("nothing to remove")
-    elif r != f:
-        eprint("-r and -f must be used together")
-    elif delay < 0:
-        eprint("delay may not be negative")
-    else:
-        return delayed_rm(paths=paths, delay=delay, rf=r)
-    return False
+            return delayed_rm(paths=paths, delay=delay, rf=r)
+    except RMError as e:
+        _eprint(e)
+        return False
+    return True
 
 
 def main(prog: str, *args: str) -> bool:

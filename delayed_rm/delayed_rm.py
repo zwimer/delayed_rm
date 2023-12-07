@@ -13,7 +13,7 @@ import sys
 import os
 
 
-__version__ = "2.4.0"
+__version__ = "2.4.1"
 
 
 #
@@ -138,11 +138,12 @@ def delayed_rm(paths: list[Path], delay: int, rf: bool) -> bool:
             try:
                 p.rename(new)
             except OSError:
+                copyf = lambda src, dst: shutil.copy2(src, dst, follow_symlinks=False)
                 if p.is_dir():
-                    shutil.copytree(p, new) # TODO: , follow_symlinks=False)
+                    shutil.copytree(p, new, copy_function=copyf, symlinks=False)
                     shutil.rmtree(p)
                 else:
-                    shutil.copy2(p, new) # TODO: , follow_symlinks=False)
+                    copyf(p, new)
                     p.unlink()
             full_where[p] = new
             where[p.name].add(outd)

@@ -33,3 +33,15 @@ delayed_rm = ["py.typed"]
 
 [tool.setuptools.dynamic]
 version = {attr = "delayed_rm.__version__"}
+
+# Tools
+
+[tool.black]
+line-length = 120
+target-version = ["py38"]
+
+[tool.ruff]
+ignore=["E731","E741"]
+line-length = 120
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401", "F403"]

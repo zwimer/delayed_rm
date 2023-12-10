@@ -13,7 +13,7 @@ import sys
 import os
 
 
-__version__ = "2.5.0"
+__version__ = "2.6.0"
 
 
 #
@@ -216,7 +216,8 @@ def main(prog: str, *args: str) -> bool:
     parser = argparse.ArgumentParser(prog=base)
     parser.add_argument("--version", action="version", version=f"{base} {__version__}")
     parser.add_argument("-d", "--delay", type=int, default=900, help="The deletion delay in seconds")
-    parser.add_argument("--log", action="store_true", help=f"Show {base}'s log files; may not be used with other arguments")
+    parser.add_argument("--log", action="store_true",
+        help=f"Show {base}'s log files; may not be used with other arguments")
     parser.add_argument("-r", action="store_true", help="rm -r; must use -f with this")
     parser.add_argument("-f", action="store_true", help="rm -f; must use -r with this")
     parser.add_argument("paths", type=Path, nargs="*", help="The items to delete")

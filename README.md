@@ -1,5 +1,5 @@
 # delayed\_rm
-Ever wish you had a few minutes to undo an rm? Now you do! 
+Ever wish you had a few minutes to undo an rm? Now you do!
 
 # Usage
 

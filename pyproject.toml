@@ -1,3 +1,35 @@
 [build-system]
-requires = ["setuptools>=46.4.0"]
+requires = ["setuptools>=61.2"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "delayed_rm"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+]
+license = {text = "GPL"}
+description = "Ever wish you had a few minutes to undo an rm? Now you do!"
+urls = {Homepage = "https://github.com/zwimer/delayed_rm"}
+requires-python = ">= 3.8"
+dynamic = ["version"]
+
+[project.readme]
+file = "README.md"
+content-type = "text/markdown"
+
+[project.scripts]
+delayed_rm = "delayed_rm:cli"
+
+[tool.setuptools]
+license-files = ["LICENSE"]
+include-package-data = false
+
+[tool.setuptools.packages]
+find = {namespaces = false}
+
+[tool.setuptools.package-data]
+delayed_rm = ["py.typed"]
+
+[tool.setuptools.dynamic]
+version = {attr = "delayed_rm.__version__"}

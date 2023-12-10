@@ -1,8 +1,8 @@
 from __future__ import annotations
 from collections import defaultdict
-from typing import Callable, Set
 from tempfile import gettempdir
 from datetime import datetime
+from typing import Callable
 from pathlib import Path
 import subprocess
 import argparse
@@ -13,7 +13,7 @@ import sys
 import os
 
 
-__version__ = "2.4.1"
+__version__ = "2.5.0"
 
 
 #
@@ -120,8 +120,8 @@ def delayed_rm(paths: list[Path], delay: int, rf: bool) -> bool:
     # Init data structures
     success: list[Path] = []
     failed: list[Path] = []
-    out_dirs: Set[Path] = { _mkdir(base / "0") }
-    where: dict[str, Set[Path]] = defaultdict(set)
+    out_dirs: set[Path] = { _mkdir(base / "0") }
+    where: dict[str, set[Path]] = defaultdict(set)
     full_where: dict[Path, Path] = {}
     # Delete files
     for p in paths:

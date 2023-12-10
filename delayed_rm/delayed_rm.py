@@ -42,6 +42,7 @@ class _Secret:
     Contains a string needed to activate the secret CLI
     Users should *not* use this, it is an internal class!
     """
+
     key: str = "DELAYED_RM_SECRET_CLI"
     value: str = "cL5r0!L4hmWmonW7k^RZM*4nq7mR&yfF"
 
@@ -58,8 +59,11 @@ def _eprint(e: str | BaseException) -> None:
     e2: str | BaseException = e
     if isinstance(e, RMError) and isinstance(e.__cause__, BaseException):
         e2 = e.__cause__
-    err: str = "Error" if isinstance(e2, RMError) or not isinstance(e, BaseException) else \
-        str(type(e2)).split("'")[1].split("delayed_rm.")[-1]
+    err: str = (
+        "Error"
+        if isinstance(e2, RMError) or not isinstance(e, BaseException)
+        else str(type(e2)).split("'")[1].split("delayed_rm.")[-1]
+    )
     print(f"{err}: {e}", file=sys.stderr)
 
 
@@ -79,7 +83,7 @@ def _prep(paths: list[Path], rf: bool) -> list[Path]:
     """
     # Normalize paths and error checking
     try:
-        paths = [ i.parent.resolve(strict=True) / i.name for i in paths ]
+        paths = [i.parent.resolve(strict=True) / i.name for i in paths]
         # pathlib.stat does not support follow_symlinks until 3.10
         if len(paths) != len({os.stat(i, follow_symlinks=False).st_ino for i in paths}):
             raise RMError("duplicate items passed")
@@ -120,7 +124,7 @@ def delayed_rm(paths: list[Path], delay: int, rf: bool) -> bool:
     # Init data structures
     success: list[Path] = []
     failed: list[Path] = []
-    out_dirs: set[Path] = { _mkdir(base / "0") }
+    out_dirs: set[Path] = {_mkdir(base / "0")}
     where: dict[str, set[Path]] = defaultdict(set)
     full_where: dict[Path, Path] = {}
     # Delete files
@@ -158,13 +162,20 @@ def delayed_rm(paths: list[Path], delay: int, rf: bool) -> bool:
     # Log result
     success_plus: list[str] = [f"{i}  --->  {full_where[i]}" for i in success]
     fmt: Callable[[list[str]], str] = lambda l: ("\n  " + "\n  ".join(l)) if l else " None"
-    msg: str = str(datetime.now()) + "\n  " + "\n".join((
-        f"Delay: {delay}",
-        f"rf: {rf}",
-        f"Storage Directory: {base}",
-        f"Succeeded:{fmt(success_plus)}",
-        f"Failed:{fmt(failed_plus)}",
-    )).replace("\n", "\n  ") + "\n\n"
+    msg: str = (
+        str(datetime.now())
+        + "\n  "
+        + "\n".join(
+            (
+                f"Delay: {delay}",
+                f"rf: {rf}",
+                f"Storage Directory: {base}",
+                f"Succeeded:{fmt(success_plus)}",
+                f"Failed:{fmt(failed_plus)}",
+            )
+        ).replace("\n", "\n  ")
+        + "\n\n"
+    )
     with log_f.open("a") as f:
         f.write(msg)
     # Delay rm and die
@@ -173,7 +184,7 @@ def delayed_rm(paths: list[Path], delay: int, rf: bool) -> bool:
     else:
         subprocess.Popen(  # pylint: disable=consider-using-with
             (sys.executable, __file__, _Secret.value, str(delay), base),
-            env = { _Secret.key: _Secret.value },
+            env={_Secret.key: _Secret.value},
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
@@ -216,8 +227,9 @@ def main(prog: str, *args: str) -> bool:
     parser = argparse.ArgumentParser(prog=base)
     parser.add_argument("--version", action="version", version=f"{base} {__version__}")
     parser.add_argument("-d", "--delay", type=int, default=900, help="The deletion delay in seconds")
-    parser.add_argument("--log", action="store_true",
-        help=f"Show {base}'s log files; may not be used with other arguments")
+    parser.add_argument(
+        "--log", action="store_true", help=f"Show {base}'s log files; may not be used with other arguments"
+    )
     parser.add_argument("-r", action="store_true", help="rm -r; must use -f with this")
     parser.add_argument("-f", action="store_true", help="rm -f; must use -r with this")
     parser.add_argument("paths", type=Path, nargs="*", help="The items to delete")

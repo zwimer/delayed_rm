@@ -13,7 +13,7 @@ import sys
 import os
 
 
-__version__ = "2.6.0"
+__version__ = "2.7.0"
 
 
 #
@@ -128,36 +128,43 @@ def delayed_rm(paths: list[Path], delay: int, rf: bool) -> bool:
     where: dict[str, set[Path]] = defaultdict(set)
     full_where: dict[Path, Path] = {}
     # Delete files
-    for p in paths:
-        # Select an output directory that an item of name p.name does not exist
-        outd: Path
-        if len(out_dirs) != len(where[p.name]):
-            outd = next(iter(out_dirs - where[p.name]))
-        else:
-            outd = _mkdir(base / str(len(out_dirs)))
-            out_dirs.add(outd)
-        # Move file into the temp directory
-        try:
-            new: Path = outd / p.name
+    ctrlc = False
+    edited = False
+    try:
+        for p in paths:
+            # Select an output directory that an item of name p.name does not exist
+            outd: Path
+            if len(out_dirs) != len(where[p.name]):
+                outd = next(iter(out_dirs - where[p.name]))
+            else:
+                outd = _mkdir(base / str(len(out_dirs)))
+                out_dirs.add(outd)
+            # Move file into the temp directory
             try:
-                p.rename(new)
-            except OSError:
-                copyf = lambda src, dst: shutil.copy2(src, dst, follow_symlinks=False)
-                if p.is_dir():
-                    shutil.copytree(p, new, copy_function=copyf, symlinks=False)
-                    shutil.rmtree(p)
-                else:
-                    copyf(p, new)
-                    p.unlink()
-            full_where[p] = new
-            where[p.name].add(outd)
-            success.append(p)
-        except OSError as e:
-            failed.append(p)
-            _eprint(e)
+                new: Path = outd / p.name
+                try:
+                    p.rename(new)
+                except OSError:
+                    copyf = lambda src, dst: shutil.copy2(src, dst, follow_symlinks=False)
+                    if p.is_dir():
+                        shutil.copytree(p, new, copy_function=copyf, symlinks=False)
+                        edited = True
+                        shutil.rmtree(p)
+                    else:
+                        copyf(p, new)
+                        edited = True
+                        p.unlink()
+                success.append(p)
+                full_where[p] = new
+                where[p.name].add(outd)
+            except OSError as e:
+                failed.append(p)
+                _eprint(e)
+    except KeyboardInterrupt:
+        ctrlc = True
     # Inform user of failures
     failed_plus: list[str] = [str(i) for i in failed]
-    if len(failed) > 0:
+    if len(failed) > 0 and not ctrlc:
         _eprint("failed to rm:\n  " + "\n  ".join(failed_plus))
     # Log result
     success_plus: list[str] = [f"{i}  --->  {full_where[i]}" for i in success]
@@ -167,7 +174,7 @@ def delayed_rm(paths: list[Path], delay: int, rf: bool) -> bool:
         + "\n  "
         + "\n".join(
             (
-                f"Delay: {delay}",
+                ("Interrupted by: SIGINT\n" if ctrlc else "") + f"Delay: {delay}",
                 f"rf: {rf}",
                 f"Storage Directory: {base}",
                 f"Succeeded:{fmt(success_plus)}",
@@ -176,10 +183,14 @@ def delayed_rm(paths: list[Path], delay: int, rf: bool) -> bool:
         ).replace("\n", "\n  ")
         + "\n\n"
     )
-    with log_f.open("a") as f:
-        f.write(msg)
+    try:
+        with log_f.open("a") as f:
+            f.write(msg)
+    except OSError:
+        print(msg)
+        raise
     # Delay rm and die
-    if not success:
+    if not edited:
         shutil.rmtree(base)
     else:
         subprocess.Popen(  # pylint: disable=consider-using-with
@@ -188,7 +199,7 @@ def delayed_rm(paths: list[Path], delay: int, rf: bool) -> bool:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-    return not failed
+    return not failed and not ctrlc
 
 
 def delayed_rm_raw(delay: int, log: bool, r: bool, f: bool, paths: list[Path]) -> bool:

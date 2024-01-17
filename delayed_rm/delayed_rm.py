@@ -1,8 +1,7 @@
-from __future__ import annotations
+from collections.abc import Callable
 from collections import defaultdict
 from tempfile import gettempdir
 from datetime import datetime
-from typing import Callable
 from pathlib import Path
 import subprocess
 import argparse
@@ -13,7 +12,7 @@ import sys
 import os
 
 
-__version__ = "2.7.0"
+__version__ = "2.8.0"
 
 
 #

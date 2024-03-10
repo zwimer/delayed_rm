@@ -12,7 +12,7 @@ import sys
 import os
 
 
-__version__ = "2.8.0"
+__version__ = "2.8.1"
 
 
 #
@@ -143,6 +143,7 @@ def delayed_rm(paths: list[Path], delay: int, rf: bool) -> bool:
                 new: Path = outd / p.name
                 try:
                     p.rename(new)
+                    edited = True
                 except OSError:
                     copyf = lambda src, dst: shutil.copy2(src, dst, follow_symlinks=False)
                     if p.is_dir():

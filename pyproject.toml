@@ -38,7 +38,7 @@ version = {attr = "delayed_rm.__version__"}
 
 [tool.black]
 line-length = 120
-target-version = ["py310"]
+target-version = ["py310", "py311", "py312"]
 
 [tool.ruff]
 ignore=["E731","E741"]

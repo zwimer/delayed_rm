@@ -12,7 +12,7 @@ import sys
 import os
 
 
-__version__ = "2.8.1"
+__version__ = "2.8.2"
 
 
 #
@@ -43,7 +43,7 @@ class _Secret:
     """
 
     key: str = "DELAYED_RM_SECRET_CLI"
-    value: str = "cL5r0!L4hmWmonW7k^RZM*4nq7mR&yfF"
+    value: str = "--:://'cL5r0!L4hmWmonW7k^RZM*4nq7mR&yfF"
 
 
 #
@@ -114,8 +114,10 @@ def delayed_rm(paths: list[Path], delay: int, rf: bool) -> bool:
     May raise an RMError if something goes wrong
     :returns: True on success, else False
     """
-    assert tmp_d.parent.exists(), "Temp dir enclosing directory does not exist"
-    assert log_f.parent.exists(), "Log file enclosing directory does not exist"
+    if not tmp_d.parent.exists():
+        raise RuntimeError("Temp dir enclosing directory does not exist")
+    if not log_f.parent.exists():
+        raise RuntimeError("Log file enclosing directory does not exist")
     # Prep
     paths = _prep(paths, rf)
     base = Path(tempfile.mkdtemp(dir=tmp_d))
@@ -193,7 +195,7 @@ def delayed_rm(paths: list[Path], delay: int, rf: bool) -> bool:
     if not edited:
         shutil.rmtree(base)
     else:
-        subprocess.Popen(  # pylint: disable=consider-using-with
+        subprocess.Popen(  # pylint: disable=consider-using-with # nosec B603
             (sys.executable, __file__, _Secret.value, str(delay), base),
             env={_Secret.key: _Secret.value},
             stdout=subprocess.DEVNULL,

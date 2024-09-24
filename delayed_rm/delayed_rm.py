@@ -12,7 +12,7 @@ import sys
 import os
 
 
-__version__ = "2.8.2"
+__version__ = "2.9.0"
 
 
 #
@@ -239,7 +239,7 @@ def main(prog: str, *args: str) -> bool:
     base: str = os.path.basename(prog)
     parser = argparse.ArgumentParser(prog=base)
     parser.add_argument("--version", action="version", version=f"{base} {__version__}")
-    parser.add_argument("-d", "--delay", type=int, default=900, help="The deletion delay in seconds")
+    parser.add_argument("--delay", "--ttl", type=int, default=900, help="The deletion delay in seconds")
     parser.add_argument(
         "--log", action="store_true", help=f"Show {base}'s log files; may not be used with other arguments"
     )

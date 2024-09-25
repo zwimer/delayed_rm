@@ -12,7 +12,7 @@ import sys
 import os
 
 
-__version__ = "2.9.0"
+__version__ = "2.9.1"
 
 
 #
@@ -214,12 +214,7 @@ def delayed_rm_raw(delay: int, log: bool, r: bool, f: bool, paths: list[Path]) -
             if r or f or paths:
                 _eprint("--log may not be used with other arguments")
                 return False
-            if log_f.exists():
-                with log_f.open("r") as file:
-                    data: str = file.read()
-                print(data + f"Log file: {log_f}")
-            else:
-                print("Log is empty")
+            print(f"{log_f.read_text()}Log file: {log_f}" if log_f.exists() else "Log is empty")
             return True
         if not paths:
             _eprint("nothing to remove")

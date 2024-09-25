@@ -3,16 +3,16 @@ from collections import defaultdict
 from tempfile import gettempdir
 from datetime import datetime
 from pathlib import Path
+from os import environ
 import subprocess
 import argparse
 import tempfile
 import shutil
 import time
 import sys
-import os
 
 
-__version__ = "2.9.1"
+__version__ = "2.9.2"
 
 
 #
@@ -83,9 +83,8 @@ def _prep(paths: list[Path], rf: bool) -> list[Path]:
     # Normalize paths and error checking
     try:
         paths = [i.parent.resolve(strict=True) / i.name for i in paths]
-        # pathlib.stat does not support follow_symlinks until 3.10
-        if len(paths) != len({os.stat(i, follow_symlinks=False).st_ino for i in paths}):
-            raise RMError("duplicate items passed")
+        if len(paths) != len({i.stat(follow_symlinks=False).st_ino for i in paths}):
+            raise RMError("duplicate or hardlinked items passed")
     except (FileNotFoundError, RuntimeError) as e:
         raise RMError(e) from e
     for i in paths:
@@ -231,7 +230,7 @@ def delayed_rm_raw(delay: int, log: bool, r: bool, f: bool, paths: list[Path]) -
 
 
 def main(prog: str, *args: str) -> bool:
-    base: str = os.path.basename(prog)
+    base: str = Path(prog).name
     parser = argparse.ArgumentParser(prog=base)
     parser.add_argument("--version", action="version", version=f"{base} {__version__}")
     parser.add_argument("--delay", "--ttl", type=int, default=900, help="The deletion delay in seconds")
@@ -259,12 +258,12 @@ def cli() -> None:
 def _secret_cli():
     """
     This CLI is invoked on import and not will do nothing by default
-    This CLI will only active if argv was intentionally configured to do so
+    This CLI will only activate if argv was intentionally configured to do so
     This entrypoint is for the spawned process to act
     """
     try:
         if len(sys.argv) == 4 and sys.argv[1] == _Secret.value:
-            if os.environ.get(_Secret.key, None) == _Secret.value:
+            if environ.get(_Secret.key, None) == _Secret.value:
                 delay = int(sys.argv[2])
                 d = Path(sys.argv[3]).resolve()
                 time.sleep(delay)

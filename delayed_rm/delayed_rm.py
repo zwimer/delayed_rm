@@ -12,7 +12,7 @@ import time
 import sys
 
 
-__version__ = "2.9.2"
+__version__ = "2.9.3"
 
 
 #
@@ -229,25 +229,20 @@ def delayed_rm_raw(delay: int, log: bool, r: bool, f: bool, paths: list[Path]) -
     return True
 
 
-def main(prog: str, *args: str) -> bool:
-    base: str = Path(prog).name
-    parser = argparse.ArgumentParser(prog=base)
-    parser.add_argument("--version", action="version", version=f"{base} {__version__}")
-    parser.add_argument("--delay", "--ttl", type=int, default=900, help="The deletion delay in seconds")
-    parser.add_argument(
-        "--log", action="store_true", help=f"Show {base}'s log files; may not be used with other arguments"
-    )
-    parser.add_argument("-r", action="store_true", help="rm -r; must use -f with this")
-    parser.add_argument("-f", action="store_true", help="rm -f; must use -r with this")
-    parser.add_argument("paths", type=Path, nargs="*", help="The items to delete")
-    return not delayed_rm_raw(**vars(parser.parse_args(args)))
-
-
 def cli() -> None:
     """
     delayed_rm CLI
     """
-    sys.exit(main(*sys.argv))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--version", action="version", version=f"{parser.prog} {__version__}")
+    parser.add_argument("--delay", "--ttl", type=int, default=900, help="The deletion delay in seconds")
+    parser.add_argument(
+        "--log", action="store_true", help=f"Show {parser.prog}'s log files; may not be used with other arguments"
+    )
+    parser.add_argument("-r", action="store_true", help="rm -r; must use -f with this")
+    parser.add_argument("-f", action="store_true", help="rm -f; must use -r with this")
+    parser.add_argument("paths", type=Path, nargs="*", help="The items to delete")
+    sys.exit(not delayed_rm_raw(**vars(parser.parse_args())))
 
 
 #

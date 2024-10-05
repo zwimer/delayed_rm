@@ -8,11 +8,12 @@ import subprocess
 import argparse
 import tempfile
 import shutil
+import math
 import time
 import sys
 
 
-__version__ = "2.9.3"
+__version__ = "2.10.0"
 
 
 #
@@ -49,6 +50,16 @@ class _Secret:
 #
 # Functions
 #
+
+
+def _size(p: Path) -> str:
+    """
+    Get file size as a human readable string
+    """
+    s = p.stat().st_size
+    lg = int(math.log(s, 1000))
+    si = " KMGT"[lg].replace(" ", "")
+    return f"{round(s/(1000**lg))} {si}B"
 
 
 def _eprint(e: str | BaseException) -> None:
@@ -213,7 +224,7 @@ def delayed_rm_raw(delay: int, log: bool, r: bool, f: bool, paths: list[Path]) -
             if r or f or paths:
                 _eprint("--log may not be used with other arguments")
                 return False
-            print(f"{log_f.read_text()}Log file: {log_f}" if log_f.exists() else "Log is empty")
+            print(f"{log_f.read_text()}Log file ({_size(log_f)}): {log_f}" if log_f.exists() else "Log is empty")
             return True
         if not paths:
             _eprint("nothing to remove")

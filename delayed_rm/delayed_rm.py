@@ -13,7 +13,7 @@ import time
 import sys
 
 
-__version__ = "2.10.0"
+__version__ = "2.11.0"
 
 
 #
@@ -55,6 +55,7 @@ class _Secret:
 def _size(p: Path) -> str:
     """
     Get file size as a human readable string
+    This does follow symlinks
     """
     s = p.stat().st_size
     lg = int(math.log(s, 1000))
@@ -99,7 +100,7 @@ def _prep(paths: list[Path], rf: bool) -> list[Path]:
     except (FileNotFoundError, RuntimeError) as e:
         raise RMError(e) from e
     for i in paths:
-        if not rf and not i.is_symlink() and i.is_dir():
+        if not rf and i.is_dir() and not i.is_symlink():
             raise RMError(f"{i} is a directory. -rf required!")
         if tmp_d == i:
             raise RMError(f"Will not delete {tmp_d}")
@@ -118,7 +119,7 @@ def _prep(paths: list[Path], rf: bool) -> list[Path]:
 
 def delayed_rm(paths: list[Path], delay: int, rf: bool) -> bool:
     """
-    Move paths to a temprary directory, delete them after delay seconds
+    Move paths to a temporary directory, delete them after delay seconds
     Log's this action to the log
     If rf, acts like rm -rf
     May raise an RMError if something goes wrong
@@ -158,7 +159,7 @@ def delayed_rm(paths: list[Path], delay: int, rf: bool) -> bool:
                     edited = True
                 except OSError:
                     copyf = lambda src, dst: shutil.copy2(src, dst, follow_symlinks=False)
-                    if p.is_dir():
+                    if p.is_dir() and not p.is_symlink():
                         shutil.copytree(p, new, copy_function=copyf, symlinks=False)
                         edited = True
                         shutil.rmtree(p)
@@ -261,21 +262,28 @@ def cli() -> None:
 #
 
 
-def _secret_cli():
+def _secret_cli() -> None:
     """
     This CLI is invoked on import and not will do nothing by default
     This CLI will only activate if argv was intentionally configured to do so
     This entrypoint is for the spawned process to act
     """
+    if len(sys.argv) > 1 and sys.argv[1] == "--force-cli":
+        del sys.argv[1]
+        cli()
     try:
-        if len(sys.argv) == 4 and sys.argv[1] == _Secret.value:
-            if environ.get(_Secret.key, None) == _Secret.value:
-                delay = int(sys.argv[2])
-                d = Path(sys.argv[3]).resolve()
-                time.sleep(delay)
-                shutil.rmtree(d)
-                with log_f.open("a") as f:
-                    f.write(f"Removing: {d}" + "\n\n")
+        if len(sys.argv) != 4 or sys.argv[1] != _Secret.value or environ.get(_Secret.key, None) != _Secret.value:
+            print(
+                "This script should be run by invoking the cli() function.\n"
+                "Pass --force-cli as the first argument to bypass this restriction.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        d = Path(sys.argv[3]).resolve()
+        time.sleep(int(sys.argv[2]))
+        shutil.rmtree(d)
+        with log_f.open("a") as f:
+            f.write(f"Removing: {d}" + "\n\n")
     except Exception:
         sys.stderr = log_f.open("a")
         sys.stdout = sys.stderr

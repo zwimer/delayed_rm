@@ -13,7 +13,7 @@ import time
 import sys
 
 
-__version__ = "2.11.0"
+__version__ = "2.12.0"
 
 
 #
@@ -160,7 +160,7 @@ def delayed_rm(paths: list[Path], delay: int, rf: bool) -> bool:
                 except OSError:
                     copyf = lambda src, dst: shutil.copy2(src, dst, follow_symlinks=False)
                     if p.is_dir() and not p.is_symlink():
-                        shutil.copytree(p, new, copy_function=copyf, symlinks=False)
+                        shutil.copytree(p, new, copy_function=copyf, symlinks=True)
                         edited = True
                         shutil.rmtree(p)
                     else:

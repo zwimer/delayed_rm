@@ -58,7 +58,7 @@ def _efmt(e: Exception) -> str:
     if not isinstance(e, shutil.Error):
         return f"{name}: {str(e)}"
     try:  # This is almost certainly from copytree it's the only thing that can raise this?
-        body = "\n".join(f"{i[0]}: {i[2]}" for i in e.args[0][0])
+        body = "\n".join(str(i[2]) for i in e.args[0])  # str is just in case
     except IndexError:  # Just in case, but shouldn't be possible
         body = str(e)
     return f"{name}: {body}"

@@ -12,22 +12,13 @@ import math
 import time
 import sys
 
-
-__version__ = "2.12.0"
-
-
-#
-# Config
-#
-
-
+# Constants
+__version__ = "3.0.0"
+_UNSAFE_FLAG = "unsafe-rmtree"
 log_f: Path = Path.home().resolve() / ".delayed_rm.log"
 tmp_d: Path = Path(gettempdir()).resolve() / ".delayed_rm"
 
-
-#
 # Classes
-#
 
 
 class RMError(Exception):
@@ -53,37 +44,39 @@ class _Secret:
 
 
 def _size(p: Path) -> str:
-    """
-    Get file size as a human readable string
-    This does follow symlinks
-    """
+    """Get file size as a human-readable string; follows symlinks"""
     s = p.stat().st_size
     lg = int(math.log(s, 1000))
     si = " KMGT"[lg].replace(" ", "")
     return f"{round(s/(1000**lg))} {si}B"
 
 
-def _eprint(e: str | BaseException) -> None:
-    """
-    Print e to stderr
-    """
-    e2: str | BaseException = e
-    if isinstance(e, RMError) and isinstance(e.__cause__, BaseException):
-        e2 = e.__cause__
-    err: str = (
-        "Error"
-        if isinstance(e2, RMError) or not isinstance(e, BaseException)
-        else str(type(e2)).split("'")[1].split("delayed_rm.")[-1]
-    )
-    print(f"{err}: {e}", file=sys.stderr)
+def _efmt(e: Exception) -> str:
+    """Format e as a printable error string"""
+    cause: BaseException = e.__cause__ if isinstance(e, RMError) and e.__cause__ is not None else e
+    name = "Error" if isinstance(cause, RMError) else cause.__class__.__name__
+    if not isinstance(e, shutil.Error):
+        return f"{name}: {str(e)}"
+    try:  # This is almost certainly from copytree it's the only thing that can raise this?
+        body = "\n".join(f"{i[0]}: {i[2]}" for i in e.args[0][0])
+    except IndexError:  # Just in case, but shouldn't be possible
+        body = str(e)
+    return f"{name}: {body}"
+
+
+def _print_stderr(x) -> None:
+    """Print x to stderr"""
+    print(x, file=sys.stderr, flush=True)
+
+
+def _print_exc(e: Exception) -> None:
+    """Print an error to stderr"""
+    _print_stderr(_efmt(e))
 
 
 def _mkdir(ret: Path) -> Path:
-    """
-    Make base/name and set permissions to 700
-    """
-    ret.mkdir()
-    ret.chmod(0o700)
+    """Make base/name and set permissions to 700"""
+    ret.mkdir(mode=0o700)
     return ret
 
 
@@ -117,14 +110,39 @@ def _prep(paths: list[Path], rf: bool) -> list[Path]:
     return paths
 
 
-def delayed_rm(paths: list[Path], delay: int, rf: bool) -> bool:
+def _rmtree(d: Path) -> str:
+    """rmtree that ignores errors and returns them as a string"""
+    err = []
+    shutil.rmtree(d, onexc=lambda *x: err.append(x[2]))
+    return "\n".join(_efmt(i) for i in err)
+
+
+def safety_check(unsafe_ok: bool) -> None:
+    """Check if this program is safe to run; raise if not or warn if unsafe_ok is True"""
+    if getattr(shutil.rmtree, "avoids_symlink_attacks", False):
+        return
+    if not unsafe_ok:
+        raise RuntimeError(
+            "This program cannot safely be run.\n"
+            "  This platform does not support fd-based dir access functions\n"
+            "  This makes rmtree vulnerable to TOCTOU attacks.\n"
+            f"  Pass --{_UNSAFE_FLAG} to bypass this"
+        )
+    _print_stderr("WARNING: Bypassing the rmtree safety check is STRONGLY discouraged")
+
+
+def delayed_rm(paths: list[Path], delay: int, rf: bool, unsafe: bool = False) -> bool:
     """
     Move paths to a temporary directory, delete them after delay seconds
     Log's this action to the log
     If rf, acts like rm -rf
     May raise an RMError if something goes wrong
+    If unsafe is False and rmtree cannot safely be used, an error will be raised
     :returns: True on success, else False
     """
+    if not paths:
+        return True
+    safety_check(unsafe)
     if not tmp_d.parent.exists():
         raise RuntimeError("Temp dir enclosing directory does not exist")
     if not log_f.parent.exists():
@@ -141,69 +159,76 @@ def delayed_rm(paths: list[Path], delay: int, rf: bool) -> bool:
     full_where: dict[Path, Path] = {}
     # Delete files
     ctrlc = False
-    edited = False
+    any_edited = False
     try:
         for p in paths:
-            # Select an output directory that an item of name p.name does not exist
-            outd: Path
+            edited = False
+            # Select the first output directory that doesn't have something named p.name in it
             if len(out_dirs) != len(where[p.name]):
-                outd = next(iter(out_dirs - where[p.name]))
+                out_d: Path = next(iter(out_dirs - where[p.name]))
             else:
-                outd = _mkdir(base / str(len(out_dirs)))
-                out_dirs.add(outd)
+                out_d = _mkdir(base / str(len(out_dirs)))
+                out_dirs.add(out_d)
             # Move file into the temp directory
+            new: Path = out_d / p.name
             try:
-                new: Path = outd / p.name
+                _copytree = False
                 try:
                     p.rename(new)
                     edited = True
                 except OSError:
-                    copyf = lambda src, dst: shutil.copy2(src, dst, follow_symlinks=False)
+                    copy3 = lambda src, dst: shutil.copy2(src, dst, follow_symlinks=False)
                     if p.is_dir() and not p.is_symlink():
-                        shutil.copytree(p, new, copy_function=copyf, symlinks=True)
+                        _copytree = True
+                        shutil.copytree(p, new, copy_function=copy3, symlinks=True)
                         edited = True
                         shutil.rmtree(p)
                     else:
-                        copyf(p, new)
+                        copy3(p, new)
                         edited = True
                         p.unlink()
                 success.append(p)
                 full_where[p] = new
-                where[p.name].add(outd)
+                where[p.name].add(out_d)
             except OSError as e:
                 failed.append(p)
-                _eprint(e)
+                _print_exc(e)
+                if edited:
+                    _print_stderr(f"WARNING: Contents of {p} may have been PARTIALLY delayed_rm'd")
+                    continue
+                if _copytree:
+                    if output := _rmtree(new):
+                        _print_stderr(output)
+                    continue
+                new.unlink()
+            finally:
+                any_edited |= edited
     except KeyboardInterrupt:
         ctrlc = True
     # Inform user of failures
     failed_plus: list[str] = [str(i) for i in failed]
     if len(failed) > 0 and not ctrlc:
-        _eprint("failed to rm:\n  " + "\n  ".join(failed_plus))
+        _print_exc(OSError("failed to rm:\n  " + "\n  ".join(failed_plus)))
     # Log result
     success_plus: list[str] = [f"{i}  --->  {full_where[i]}" for i in success]
-    fmt: Callable[[list[str]], str] = lambda l: ("\n  " + "\n  ".join(l)) if l else " None"
-    msg: str = (
-        str(datetime.now())
-        + "\n  "
-        + "\n".join(
-            (
-                ("Interrupted by: SIGINT\n" if ctrlc else "") + f"Delay: {delay}",
-                f"rf: {rf}",
-                f"Storage Directory: {base}",
-                f"Succeeded:{fmt(success_plus)}",
-                f"Failed:{fmt(failed_plus)}",
-            )
-        ).replace("\n", "\n  ")
-        + "\n\n"
+    fmt: Callable[[list[str]], str] = lambda l: ("\n  " + "\n  ".join(l)) if l else " False"
+    lines = (
+        f"{datetime.now()}{'\nInterrupted by: SIGINT' if ctrlc else ''}",
+        f"Delay: {delay}",
+        f"rf: {rf}",
+        f"Storage Directory: {base}",
+        f"Succeeded:{fmt(success_plus)}",
+        f"Failed:{fmt(failed_plus)}",
     )
+    msg = "\n".join(lines).replace("\n", "\n  ") + "\n\n"
     try:
         with log_f.open("a") as f:
             f.write(msg)
     except OSError:
-        print(msg)
+        _print_stderr(msg)
         raise
     # Delay rm and die
-    if not edited:
+    if not any_edited:
         shutil.rmtree(base)
     else:
         subprocess.Popen(  # pylint: disable=consider-using-with # nosec B603
@@ -215,7 +240,7 @@ def delayed_rm(paths: list[Path], delay: int, rf: bool) -> bool:
     return not failed and not ctrlc
 
 
-def delayed_rm_raw(delay: int, log: bool, r: bool, f: bool, paths: list[Path]) -> bool:
+def delayed_rm_raw(delay: int, log: bool, r: bool, f: bool, paths: list[Path], unsafe: bool = False) -> bool:
     """
     A delayed_rm wrapper that handles CLI arguments
     :returns: True on success, else False
@@ -223,20 +248,20 @@ def delayed_rm_raw(delay: int, log: bool, r: bool, f: bool, paths: list[Path]) -
     try:
         if log:
             if r or f or paths:
-                _eprint("--log may not be used with other arguments")
+                _print_exc(ValueError("--log may not be used with other arguments"))
                 return False
             print(f"{log_f.read_text()}Log file ({_size(log_f)}): {log_f}" if log_f.exists() else "Log is empty")
             return True
         if not paths:
-            _eprint("nothing to remove")
+            _print_exc(ValueError("nothing to remove; try --help"))
         elif r != f:
-            _eprint("-r and -f must be used together")
+            _print_exc(ValueError("-r and -f must be used together"))
         elif delay < 0:
-            _eprint("delay may not be negative")
+            _print_exc(ValueError("delay may not be negative"))
         else:
-            return delayed_rm(paths=paths, delay=delay, rf=r)
+            return delayed_rm(paths=paths, delay=delay, rf=r, unsafe=unsafe)
     except RMError as e:
-        _eprint(e)
+        _print_exc(e)
         return False
     return True
 
@@ -254,6 +279,7 @@ def cli() -> None:
     parser.add_argument("-r", action="store_true", help="rm -r; must use -f with this")
     parser.add_argument("-f", action="store_true", help="rm -f; must use -r with this")
     parser.add_argument("paths", type=Path, nargs="*", help="The items to delete")
+    parser.add_argument(f"--{_UNSAFE_FLAG}", dest="unsafe", action="store_true", help=argparse.SUPPRESS)
     sys.exit(not delayed_rm_raw(**vars(parser.parse_args())))
 
 
@@ -273,21 +299,25 @@ def _secret_cli() -> None:
         cli()
     try:
         if len(sys.argv) != 4 or sys.argv[1] != _Secret.value or environ.get(_Secret.key, None) != _Secret.value:
-            print(
+            _print_stderr(
                 "This script should be run by invoking the cli() function.\n"
                 "Pass --force-cli as the first argument to bypass this restriction.",
-                file=sys.stderr,
             )
             sys.exit(1)
         d = Path(sys.argv[3]).resolve()
         time.sleep(int(sys.argv[2]))
-        shutil.rmtree(d)
         with log_f.open("a") as f:
-            f.write(f"Removing: {d}" + "\n\n")
+            if not d.exists(follow_symlinks=False):
+                f.write(f"Directory {d} does not exist, nothing to do\n\n")
+                return
+            f.write(f"Removing: {d}")
+            if errs := _rmtree(d):
+                f.write(errs)
+            f.write("\n\n")
     except Exception:
         sys.stderr = log_f.open("a")
         sys.stdout = sys.stderr
-        print(f"argv: {sys.argv}", flush=True)
+        _print_stderr(f"argv: {sys.argv}")
         raise
 
 

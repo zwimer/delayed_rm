@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "delayed_rm"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.12",
     "Development Status :: 5 - Production/Stable",
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
 ]
@@ -14,7 +14,7 @@ keywords = ["rm"]
 license = {text = "GPLv3"}
 description = "Ever wish you had a few minutes to undo an rm? Now you do!"
 urls = {Homepage = "https://github.com/zwimer/delayed_rm"}
-requires-python = ">= 3.10"
+requires-python = ">= 3.12"
 dynamic = ["version"]
 
 [project.readme]
@@ -41,7 +41,7 @@ version = {attr = "delayed_rm.__version__"}
 
 [tool.black]
 line-length = 120
-target-version = ["py310", "py311", "py312"]
+target-version = ["py312", "py313"]
 
 [tool.ruff]
 ignore=["E731","E741"]

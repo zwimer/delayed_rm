@@ -13,7 +13,7 @@ import time
 import sys
 
 # Constants
-__version__ = "3.0.0"
+__version__ = "3.0.1"
 _UNSAFE_FLAG = "unsafe-rmtree"
 log_f: Path = Path.home().resolve() / ".delayed_rm.log"
 tmp_d: Path = Path(gettempdir()).resolve() / ".delayed_rm"
@@ -185,8 +185,8 @@ def delayed_rm(paths: list[Path], delay: int, rf: bool, unsafe: bool = False) ->
                         shutil.rmtree(p)
                     else:
                         copy3(p, new)
-                        edited = True
                         p.unlink()
+                        edited = True
                 success.append(p)
                 full_where[p] = new
                 where[p.name].add(out_d)

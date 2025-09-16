@@ -13,7 +13,7 @@ import time
 import sys
 
 # Constants
-__version__ = "3.0.1"
+__version__ = "3.0.2"
 _UNSAFE_FLAG = "unsafe-rmtree"
 log_f: Path = Path.home().resolve() / ".delayed_rm.log"
 tmp_d: Path = Path(gettempdir()).resolve() / ".delayed_rm"
@@ -195,18 +195,18 @@ def delayed_rm(paths: list[Path], delay: int, rf: bool, unsafe: bool = False) ->
                 _print_exc(e)
                 if edited:
                     _print_stderr(f"WARNING: Contents of {p} may have been PARTIALLY delayed_rm'd")
-                    continue
-                if _copytree:
-                    if output := _rmtree(new):
-                        _print_stderr(output)
-                    continue
-                new.unlink()
+                elif not new.exists(follow_symlinks=False):
+                    pass
+                elif not _copytree:
+                    new.unlink()
+                elif output := _rmtree(new):
+                    _print_stderr(output)
             finally:
                 any_edited |= edited
     except KeyboardInterrupt:
         ctrlc = True
     # Inform user of failures
-    failed_plus: list[str] = [str(i) for i in failed]
+    failed_plus: list[str] = list(map(str, failed))
     if len(failed) > 0 and not ctrlc:
         _print_exc(OSError("failed to rm:\n  " + "\n  ".join(failed_plus)))
     # Log result

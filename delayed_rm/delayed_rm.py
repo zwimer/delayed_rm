@@ -13,7 +13,7 @@ import time
 import sys
 
 # Constants
-__version__ = "3.0.2"
+__version__ = "3.1.0"
 _UNSAFE_FLAG = "unsafe-rmtree"
 log_f: Path = Path.home().resolve() / ".delayed_rm.log"
 tmp_d: Path = Path(gettempdir()).resolve() / ".delayed_rm"
@@ -149,7 +149,7 @@ def delayed_rm(paths: list[Path], delay: int, rf: bool, unsafe: bool = False) ->
         raise RuntimeError("Log file enclosing directory does not exist")
     # Prep
     paths = _prep(paths, rf)
-    base = Path(tempfile.mkdtemp(dir=tmp_d))
+    base = Path(tempfile.mkdtemp(dir=tmp_d)).absolute()
     base.chmod(0o700)
     # Init data structures
     success: list[Path] = []
@@ -236,6 +236,7 @@ def delayed_rm(paths: list[Path], delay: int, rf: bool, unsafe: bool = False) ->
             env={_Secret.key: _Secret.value},
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
+            cwd=Path.cwd().root,
         )
     return not failed and not ctrlc
 

@@ -13,7 +13,7 @@ import time
 import sys
 
 # Constants
-__version__ = "3.1.2"
+__version__ = "3.1.4"
 _UNSAFE_FLAG = "unsafe-rmtree"
 log_f: Path = Path.home().resolve() / ".delayed_rm.log"
 tmp_d: Path = Path(gettempdir()).resolve() / ".delayed_rm"
@@ -56,7 +56,7 @@ def _efmt(e: Exception) -> str:
     cause: BaseException = e.__cause__ if isinstance(e, RMError) and e.__cause__ is not None else e
     name = "Error" if isinstance(cause, RMError) else cause.__class__.__name__
     if not isinstance(e, shutil.Error):
-        return f"{name}: {str(e)}"
+        return f"{name}: {e!s}"
     try:  # This is almost certainly from copytree it's the only thing that can raise this?
         body = "\n".join(str(i[2]) for i in e.args[0])  # str is just in case
     except IndexError:  # Just in case, but shouldn't be possible

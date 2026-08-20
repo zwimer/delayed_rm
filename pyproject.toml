@@ -46,7 +46,33 @@ target-version = ["py312", "py313", "py314"]
 [tool.ruff]
 line-length = 120
 [tool.ruff.lint]
-ignore=["E731", "E741", "I001", "DTZ005"]
+ignore=[
+	"D10", "D2", "D403", "D415",
+	"DTZ005",
+	"E731", "E741",
+	"I001",
+	"PLR0912", "PLR0913", "PLR0915", "PLR2004",
+	"S603",
+]
+extend-select = [
+	"ANN",
+	"ARG",
+	"ASYNC",
+	"C4",
+	"D",
+	"DTZ",
+	"PERF",
+	"PGH",
+	"PIE",
+	"PL",
+	"PTH",
+	"RET",
+	"S",
+	"SIM",
+	"TID"
+]
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "F403"]
 

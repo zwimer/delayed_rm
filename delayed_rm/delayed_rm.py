@@ -13,7 +13,7 @@ import time
 import sys
 
 # Constants
-__version__ = "3.2.0"
+__version__ = "3.2.1"
 _UNSAFE_FLAG = "unsafe-rmtree"
 log_f: Path = Path.home().resolve() / ".delayed_rm.log"
 tmp_d: Path = Path(gettempdir()).resolve() / ".delayed_rm"
@@ -22,15 +22,13 @@ tmp_d: Path = Path(gettempdir()).resolve() / ".delayed_rm"
 
 
 class RMError(Exception):
-    """
-    A custom class meant to be raised for 'expected' errors
+    """A custom class meant to be raised for 'expected' errors
     Raising this should lead to the cli program exiting
     """
 
 
 class _Secret:
-    """
-    Contains a string needed to activate the secret CLI
+    """Contains a string needed to activate the secret CLI
     Users should *not* use this, it is an internal class!
     """
 
@@ -64,7 +62,7 @@ def _efmt(e: Exception) -> str:
     return f"{name}: {body}"
 
 
-def _print_stderr(x) -> None:
+def _print_stderr(x: str) -> None:
     """Print x to stderr"""
     print(x, file=sys.stderr, flush=True)
 
@@ -81,9 +79,10 @@ def _mkdir(ret: Path) -> Path:
 
 
 def _prep(paths: list[Path], rf: bool) -> list[Path]:
-    """
-    Normalize paths, error check, and prep temp items
-    :return: A normalized list of paths
+    """Normalize paths, error check, and prep temp items
+
+    Returns:
+        A normalized list of paths
     """
     # Normalize paths and error checking
     try:
@@ -132,13 +131,14 @@ def safety_check(unsafe_ok: bool) -> None:
 
 
 def delayed_rm(paths: list[Path], delay: int, rf: bool, unsafe: bool = False) -> bool:
-    """
-    Move paths to a temporary directory, delete them after delay seconds
+    """Move paths to a temporary directory, delete them after delay seconds
     Log's this action to the log
     If rf, acts like rm -rf
     May raise an RMError if something goes wrong
     If unsafe is False and rmtree cannot safely be used, an error will be raised
-    :returns: True on success, else False
+
+    Returns:
+        True on success, else False
     """
     if not paths:
         return True
@@ -241,10 +241,11 @@ def delayed_rm(paths: list[Path], delay: int, rf: bool, unsafe: bool = False) ->
     return not failed and not ctrlc
 
 
-def delayed_rm_raw(delay: int, log: bool, r: bool, f: bool, paths: list[Path], unsafe: bool = False) -> bool:
-    """
-    A delayed_rm wrapper that handles CLI arguments
-    :returns: True on success, else False
+def delayed_rm_raw(paths: list[Path], delay: int, *, log: bool, r: bool, f: bool, unsafe: bool = False) -> bool:
+    """A delayed_rm wrapper that handles CLI arguments
+
+    Returns:
+        True on success, else False
     """
     try:
         if log:
@@ -268,9 +269,7 @@ def delayed_rm_raw(delay: int, log: bool, r: bool, f: bool, paths: list[Path], u
 
 
 def cli() -> None:
-    """
-    delayed_rm CLI
-    """
+    """delayed_rm CLI"""
     parser = argparse.ArgumentParser()
     parser.add_argument("--version", action="version", version=f"{parser.prog} {__version__}")
     parser.add_argument("--delay", "--ttl", type=int, default=900, help="The deletion delay in seconds")
@@ -290,8 +289,7 @@ def cli() -> None:
 
 
 def _secret_cli() -> None:
-    """
-    This CLI is invoked on import and not will do nothing by default
+    """This CLI is invoked on import and not will do nothing by default
     This CLI will only activate if argv was intentionally configured to do so
     This entrypoint is for the spawned process to act
     """

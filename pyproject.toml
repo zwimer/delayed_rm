@@ -39,6 +39,15 @@ version = {attr = "delayed_rm.__version__"}
 
 # Tools
 
+[tool.pylint]
+disable = [
+	"missing-module-docstring",
+	"too-many-arguments",
+	"line-too-long"
+]
+[tool.pylint.main]
+jobs = 0
+
 [tool.black]
 line-length = 120
 target-version = ["py312", "py313", "py314"]

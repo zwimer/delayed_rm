@@ -13,7 +13,7 @@ import time
 import sys
 
 # Constants
-__version__ = "3.2.1"
+__version__ = "3.2.2"
 _UNSAFE_FLAG = "unsafe-rmtree"
 log_f: Path = Path.home().resolve() / ".delayed_rm.log"
 tmp_d: Path = Path(gettempdir()).resolve() / ".delayed_rm"
@@ -27,7 +27,7 @@ class RMError(Exception):
     """
 
 
-class _Secret:
+class _Secret:  # pylint: disable=too-few-public-methods
     """Contains a string needed to activate the secret CLI
     Users should *not* use this, it is an internal class!
     """
@@ -130,6 +130,12 @@ def safety_check(unsafe_ok: bool) -> None:
     _print_stderr("WARNING: Bypassing the rmtree safety check is STRONGLY discouraged")
 
 
+def copy3(src: str | Path, dst: str | Path) -> str:
+    """copy2 but does not follow symlinks"""
+    return shutil.copy2(src, dst, follow_symlinks=False)  # type: ignore[arg-type]
+
+
+# pylint: disable=too-many-branches,too-many-statements,too-many-locals
 def delayed_rm(paths: list[Path], delay: int, rf: bool, unsafe: bool = False) -> bool:
     """Move paths to a temporary directory, delete them after delay seconds
     Log's this action to the log
@@ -171,20 +177,19 @@ def delayed_rm(paths: list[Path], delay: int, rf: bool, unsafe: bool = False) ->
                 out_dirs.add(out_d)
             # Move file into the temp directory
             new: Path = out_d / p.name
+            _copytree = False
             try:
-                _copytree = False
                 try:
-                    p.rename(new)
+                    p.replace(new)
                     edited = True
                 except OSError:
-                    copy3 = lambda src, dst: shutil.copy2(src, dst, follow_symlinks=False)
                     if p.is_dir() and not p.is_symlink():
                         _copytree = True
                         shutil.copytree(p, new, copy_function=copy3, symlinks=True)
                         edited = True
                         shutil.rmtree(p)
                     else:
-                        copy3(p, new)
+                        _ = copy3(p, new)
                         p.unlink()
                         edited = True
                 success.append(p)

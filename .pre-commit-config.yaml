@@ -103,3 +103,7 @@ repos:
       additional_dependencies: [".[toml]"]
       args: ["-c", "pyproject.toml", "-r", "."]
 
+-   repo: https://github.com/pycqa/pylint
+    rev: v4.0.8
+    hooks:
+    -   id: pylint

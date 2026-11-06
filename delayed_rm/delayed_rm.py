@@ -27,7 +27,8 @@ class RMError(Exception):
     """
 
 
-class _Secret:  # pylint: disable=too-few-public-methods
+# pylint: disable-next=too-few-public-methods
+class _Secret:
     """Contains a string needed to activate the secret CLI
     Users should *not* use this, it is an internal class!
     """
@@ -135,7 +136,7 @@ def copy3(src: str | Path, dst: str | Path) -> str:
     return shutil.copy2(src, dst, follow_symlinks=False)  # type: ignore[arg-type]
 
 
-# pylint: disable=too-many-branches,too-many-statements,too-many-locals
+# pylint: disable-next=too-many-branches,too-many-statements,too-many-locals
 def delayed_rm(paths: list[Path], delay: int, rf: bool, unsafe: bool = False) -> bool:
     """Move paths to a temporary directory, delete them after delay seconds
     Log's this action to the log
@@ -236,7 +237,8 @@ def delayed_rm(paths: list[Path], delay: int, rf: bool, unsafe: bool = False) ->
     if not any_edited:
         shutil.rmtree(base)
     else:
-        subprocess.Popen(  # pylint: disable=consider-using-with # nosec B603
+        # pylint: disable-next=consider-using-with
+        subprocess.Popen(  # nosec B603
             (sys.executable, __file__, _Secret.value, str(delay), base),
             env={_Secret.key: _Secret.value},
             stdout=subprocess.DEVNULL,

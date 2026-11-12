@@ -13,7 +13,7 @@ import time
 import sys
 
 # Constants
-__version__ = "3.2.2"
+__version__ = "3.2.3"
 _UNSAFE_FLAG = "unsafe-rmtree"
 log_f: Path = Path.home().resolve() / ".delayed_rm.log"
 tmp_d: Path = Path(gettempdir()).resolve() / ".delayed_rm"
